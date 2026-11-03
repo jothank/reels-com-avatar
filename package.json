@@ -1,0 +1,24 @@
+{
+  "name": "reels-com-avatar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reels com avatar animado e voz clonada, gerados por código (Remotion).",
+  "scripts": {
+    "studio": "remotion studio",
+    "build:reel": "python3 scripts/build_reel.py",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/caveat": "5.3.0",
+    "@fontsource/poppins": "5.3.0",
+    "@fontsource/space-mono": "5.3.0",
+    "@remotion/cli": "4.0.539",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.539"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+out/
+public/reels/
+.remotion/
+*.log
+
+# trechos cortados (gerados por scripts/montar_gravacao.py)
+gravacoes/*/cena-*.wav
+__pycache__/
+modelos/
+gravacoes/**/*.opus
+gravacoes/**/*.m4a
+gravacoes/**/*.mp3
+gravacoes/**/*.ogg
+gravacoes/**/*.wav

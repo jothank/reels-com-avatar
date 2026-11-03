@@ -1,0 +1,87 @@
+{
+  "id": "o-que-e-api",
+  "titulo": "O que é uma API?",
+  "assinatura": "@seuperfil",
+  "voz": {
+    "motor": "auto",
+    "voz_espeak": "mb-br3",
+    "velocidade_espeak": 160,
+    "voz_edge": "pt-BR-AntonioNeural",
+    "voz_voicestudio": "Jonathan"
+  },
+  "cenas": [
+    {
+      "layout": "hook",
+      "badge": "Você sabia?",
+      "titulo": "O que é uma *API*?",
+      "subtitulo": "explicado em _30s_",
+      "pose": "acena",
+      "bolha": "Bora *aprender*!",
+      "fala": "Você usa API todo dia e nem percebe. Bora entender em trinta segundos?"
+    },
+    {
+      "layout": "fluxo",
+      "titulo": "Pensa num *restaurante*",
+      "itens": [
+        {
+          "emoji": "🙋",
+          "texto": "Você",
+          "detalhe": "faz o pedido"
+        },
+        {
+          "emoji": "🤵",
+          "texto": "Garçom",
+          "detalhe": "leva e traz"
+        },
+        {
+          "emoji": "👨‍🍳",
+          "texto": "Cozinha",
+          "detalhe": "prepara"
+        }
+      ],
+      "legenda": "O garçom é a *API*",
+      "pose": "aponta",
+      "fala": "Pensa num restaurante. Você faz o pedido pro garçom, ele leva até a cozinha e volta com o seu prato. O garçom é a API."
+    },
+    {
+      "layout": "codigo",
+      "titulo": "Na prática",
+      "pedido": "GET /clima?cidade=SP",
+      "resposta": "{ \"temp\": \"27°C\" }",
+      "pose": "explica",
+      "expressao": "surpreso",
+      "bolha": "pede ➜ *recebe*",
+      "fala": "Na prática, um aplicativo faz um pedido, tipo: me dá o clima de São Paulo. A API leva isso até o servidor e devolve a resposta."
+    },
+    {
+      "layout": "lista",
+      "titulo": "Tudo isso é *API*",
+      "itens": [
+        {
+          "emoji": "🔐",
+          "texto": "Login com Google"
+        },
+        {
+          "emoji": "💸",
+          "texto": "Pagamento com Pix"
+        },
+        {
+          "emoji": "🌦️",
+          "texto": "Previsão do tempo"
+        }
+      ],
+      "pose": "duvida",
+      "fala": "Login com Google, pagamento com Pix, previsão do tempo. Tudo isso é API conversando por trás."
+    },
+    {
+      "layout": "cta",
+      "titulo": "Salva pra *não esquecer*!",
+      "botoes": [
+        "📌 Salva",
+        "➕ Segue"
+      ],
+      "pose": "joinha",
+      "fala": "Salva esse vídeo e me segue pra mais tutoriais rápidos!"
+    }
+  ]
+}

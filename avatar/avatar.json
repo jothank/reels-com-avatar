@@ -1,0 +1,29 @@
+{
+  "modo": "svg",
+  "nome": "Jonathan",
+  "svg": {
+    "pele": "#DCA68C",
+    "rosto": "oval",
+    "corpo": "magro",
+    "palpebras": true,
+    "cabelo": {"estilo": "entradas", "cor": "#3B312B"},
+    "olhos": "#3A2A22",
+    "sobrancelhas": "#2A211D",
+    "oculos": {"formato": "retangular", "cor": "#141418"},
+    "barba": "longa",
+    "corBarba": "#2F2723",
+    "roupa": {"tipo": "moletom", "cor": "#26292D", "detalhe": "#3A3E43", "cordao": "#4A4F55"},
+    "brinco": false
+  },
+  "png": {
+    "poses": {
+      "idle": "avatar/poses/idle.png",
+      "aponta": "avatar/poses/aponta.png",
+      "acena": "avatar/poses/acena.png",
+      "explica": "avatar/poses/explica.png",
+      "joinha": "avatar/poses/joinha.png",
+      "duvida": "avatar/poses/duvida.png"
+    },
+    "posesBocaAberta": {}
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "id": "minha-voz-clonada",
+  "titulo": "Essa voz é minha?",
+  "assinatura": "@jothankdev",
+  "voz": {
+    "motor": "auto",
+    "voz_espeak": "mb-br3",
+    "velocidade_espeak": 160,
+    "voz_edge": "pt-BR-AntonioNeural",
+    "voz_voicestudio": "Jonathan",
+    "modelo_voicestudio": "voxcpm2",
+    "pronuncia": {
+      "VoiceStudio": "Vóice Stúdio",
+      "Remotion": "Rimóshon",
+      "WhatsApp": "uátsap",
+      "YouTube": "iutúbi",
+      "TikTok": "tiquitóqui",
+      "jothankdev": "jótank dév",
+      "Claude Code": "Clóud Côud",
+      "PC": "pecê"
+    }
+  },
+  "cenas": [
+    {
+      "layout": "hook",
+      "badge": "Teste",
+      "titulo": "Essa voz é *minha*?",
+      "subtitulo": "feito com _IA local_",
+      "pose": "acena",
+      "expressao": "surpreso",
+      "bolha": "Escuta só!",
+      "fala": "Essa voz parece a minha, né? Mas quem está falando agora é uma IA. Vou te mostrar como eu fiz."
+    },
+    {
+      "layout": "fluxo",
+      "titulo": "1. A *voz*",
+      "itens": [
+        {"emoji": "🎙️", "texto": "Áudios", "detalhe": "3 minutos"},
+        {"emoji": "🧠", "texto": "Clone", "detalhe": "VoiceStudio"},
+        {"emoji": "🔊", "texto": "Fala nova", "detalhe": "qualquer texto"}
+      ],
+      "legenda": "a IA aprende o seu jeito de falar",
+      "pose": "aponta",
+      "fala": "Primeiro, gravei três minutinhos de áudio no WhatsApp. O VoiceStudio aprendeu a minha voz e agora fala qualquer texto."
+    },
+    {
+      "layout": "lista",
+      "titulo": "2. O *avatar*",
+      "itens": [
+        {"emoji": "📸", "texto": "Mandei fotos", "detalhe": "quatro selfies"},
+        {"emoji": "🎨", "texto": "Virou desenho", "detalhe": "feito em código"},
+        {"emoji": "👄", "texto": "Boca sincronizada", "detalhe": "segue a fala"}
+      ],
+      "pose": "explica",
+      "fala": "Depois, mandei umas fotos. A IA transformou em desenho, e a boca acompanha cada palavra que eu falo."
+    },
+    {
+      "layout": "codigo",
+      "titulo": "3. Um *comando*",
+      "rotuloPedido": "eu digito",
+      "pedido": "build_reel.py roteiro.json",
+      "rotuloResposta": "sai pronto",
+      "resposta": "videos/reel.mp4 ✓\nvoz + boca sincronizada",
+      "pose": "explica",
+      "expressao": "pensativo",
+      "fala": "Aí eu escrevo o roteiro, rodo um comando, e o Remotion monta o vídeo inteiro sozinho."
+    },
+    {
+      "layout": "fluxo",
+      "titulo": "4. Quem *montou*",
+      "itens": [
+        {"emoji": "🗣️", "texto": "Eu pedi", "detalhe": "em português"},
+        {"emoji": "🤖", "texto": "Claude Code", "detalhe": "instala e configura"},
+        {"emoji": "✅", "texto": "Pronto", "detalhe": "pra usar"}
+      ],
+      "legenda": "uma IA programando pra mim",
+      "pose": "aponta",
+      "fala": "Quem instalou e configurou tudo isso? Outra IA, o Claude Code. Eu só pedi o que eu queria, em português."
+    },
+    {
+      "layout": "lista",
+      "titulo": "Tudo *de graça*",
+      "itens": [
+        {"emoji": "💻", "texto": "Roda no PC", "detalhe": "placa de vídeo comum"},
+        {"emoji": "🔒", "texto": "Sem nuvem", "detalhe": "nada sai da máquina"},
+        {"emoji": "💸", "texto": "Zero assinatura", "detalhe": "código aberto"}
+      ],
+      "pose": "explica",
+      "fala": "O melhor de tudo: roda no meu computador, de graça, sem mandar nada pra nuvem."
+    },
+    {
+      "layout": "cta",
+      "titulo": "Segue *@jothankdev*",
+      "botoes": ["📸 Instagram", "▶️ YouTube", "🎵 TikTok"],
+      "pose": "joinha",
+      "bolha": "Valeu!",
+      "fala": "Gostou? Me segue no Instagram, no YouTube e no TikTok: arroba jothankdev. Vem muito mais IA por aí!"
+    }
+  ]
+}
