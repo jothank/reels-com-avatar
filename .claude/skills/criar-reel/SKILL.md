@@ -112,11 +112,19 @@ No modo `auto`, o script detecta o VoiceStudio em `http://localhost:3900` (ou `V
 **Motor recomendado: VoxCPM2** (`"modelo_voicestudio": "voxcpm2"`): Apache-2.0 (pode usar comercialmente),
 fala português, roda na GPU. Testado com o VoiceStudio 0.5.7.
 O OmniVoice (padrão do app) é **não comercial** (CC-BY-NC) e pede aceite de licença no app.
-Para o render final use `--motor voicestudio --conferir 3`: no `auto`, se o VoiceStudio falhar, o script cai calado
+Para o render final use `--motor voicestudio --conferir 5`: no `auto`, se o VoiceStudio falhar, o script cai calado
 para o edge-tts; e o VoxCPM2 às vezes engole ou troca palavras, então o `--conferir` transcreve cada fala com o Whisper e
-gera de novo (até 3 vezes) quando não bate com o roteiro. O log mostra o que foi ouvido em cada cena: leia antes de entregar.
+gera de novo (até 5 vezes) quando não bate com o roteiro. O log mostra o que foi ouvido em cada cena: leia antes de entregar.
+**Ritmo da fala:** sem instrução, o clone fala a 200–250 palavras por minuto, rápido demais para entender. Use sempre em `voz`:
+`"estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences."`
+(vai como `instruct` para o VoxCPM2; em inglês funcionou melhor que em português) e `"ritmo": [140, 175]`.
+Com o `--conferir`, o build fica com a tentativa mais clara e mais perto dessa faixa, encurta pausas acima de
+0,5 s e deixa 0,67 s de respiro no fim de cada cena. O `speed` e o `duration` da API quase não mudam nada no VoxCPM2.
 Nomes estrangeiros saem melhor com grafia de pronúncia em `voz.pronuncia` (ex.: `"Remotion": "Rimóshon"`,
-`"VoiceStudio": "Vóice Stúdio"`); evite "reel" na fala (sai "rei").
+`"VoiceStudio": "Vóice Stúdio"`); evite "reel" na fala (sai "rei"). Grafias que já funcionaram:
+`"Postman": "Pôust mén"`, `"IA": "ia"` (em maiúsculas a palavra some), `"skill": "isquíl"`. Não comece a fala com
+um nome em inglês ("Skill é…" saiu "SQL é…"): ponha um artigo antes ("Uma skill é…"). A chave do `pronuncia`
+diferencia maiúsculas: "Skill" e "skill" são entradas diferentes.
 
 **VoiceStudio no Windows pelo Claude Desktop:**
 - Se `http://localhost:3900/health` não responder, abra o app **fora do sandbox** (`dangerouslyDisableSandbox`):

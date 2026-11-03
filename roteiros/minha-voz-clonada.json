@@ -8,6 +8,8 @@
     "velocidade_espeak": 160,
     "voz_edge": "pt-BR-AntonioNeural",
     "voz_voicestudio": "Jonathan",
+    "estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences.",
+    "ritmo": [140, 175],
     "modelo_voicestudio": "voxcpm2",
     "pronuncia": {
       "VoiceStudio": "Vóice Stúdio",

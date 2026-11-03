@@ -7,7 +7,7 @@ Uso:
   python3 scripts/build_reel.py roteiros/o-que-e-api.json
   python3 scripts/build_reel.py roteiros/x.json --motor espeak --sem-render
   python3 scripts/build_reel.py roteiros/x.json --frame 120   # só um quadro PNG (prévia)
-  python3 scripts/build_reel.py roteiros/x.json --motor voicestudio --conferir 3   # voz clonada, conferida
+  python3 scripts/build_reel.py roteiros/x.json --motor voicestudio --conferir 5   # voz clonada, conferida e no ritmo
 
 Sua voz: grave o roteiro inteiro num áudio só, com ~2 s de pausa entre as cenas, e
 coloque "audio_unico": "gravacoes/<id>.m4a" no roteiro. O script corta nas pausas.
@@ -41,7 +41,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 FPS = 30
 TAXA = 48000
 INICIO_FALA = 6  # frames de respiro antes da fala em cada cena
-FIM_FALA = 14  # frames depois da fala
+FIM_FALA = 20  # frames depois da fala: respiro antes da próxima cena
 
 
 def log(msg: str) -> None:
@@ -141,6 +141,8 @@ def tts_voicestudio(texto: str, destino: Path, voz: dict) -> None:
         "language": "pt",
         "speed": voz.get("velocidade_voicestudio", 1.0),
     }
+    if voz.get("estilo_voicestudio"):  # ex.: "Speak slowly and calmly…": o VoxCPM2 fala mais devagar e com pausas
+        corpo["instruct"] = voz["estilo_voicestudio"]
     headers = {"Content-Type": "application/json"}
     if os.environ.get("VOICESTUDIO_API_KEY"):
         headers["Authorization"] = f"Bearer {os.environ['VOICESTUDIO_API_KEY']}"
@@ -155,6 +157,78 @@ def tts_voicestudio(texto: str, destino: Path, voz: dict) -> None:
     para_wav(tmp, destino)
     tmp.unlink(missing_ok=True)
     apara_inicio(destino)
+    encurta_pausas(destino)
+
+
+def encurta_pausas(wav: Path, maximo: float = 0.5, sobra_fim: float = 0.12) -> None:
+    """Encurta silêncios longos no meio da fala e corta o silêncio do fim.
+
+    Com o estilo calmo, o VoxCPM2 às vezes para quase um segundo no meio da frase: até ~0,5 s
+    soa como respiro, mais que isso parece que travou. O fim fica com 120 ms; o respiro entre
+    as cenas é o FIM_FALA.
+    """
+    import numpy as np
+
+    amostras, taxa = le_wav(wav)
+    x = np.asarray(amostras, dtype=np.int32)
+    jan = taxa // 50  # 20 ms
+    n = len(x) // jan
+    if n < 10:
+        return
+    db = 20 * np.log10(np.sqrt(np.mean((x[: n * jan].reshape(n, jan) / 32768.0) ** 2, axis=1)) + 1e-9)
+    voz_ = db > np.percentile(db, 90) - 30
+    com_voz = np.flatnonzero(voz_)
+    if not len(com_voz):
+        return
+    limite = int(maximo / 0.02)
+    manter = np.ones(n, dtype=bool)
+    manter[com_voz[-1] + 1 + int(sobra_fim / 0.02):] = False
+    k = com_voz[0]
+    while k <= com_voz[-1]:
+        if voz_[k]:
+            k += 1
+            continue
+        fim = k
+        while fim <= com_voz[-1] and not voz_[fim]:
+            fim += 1
+        if fim - k > limite:  # fica a metade do respiro de cada lado
+            manter[k + limite // 2:fim - (limite - limite // 2)] = False
+        k = fim
+    if manter.all():
+        return
+    pedacos, rampa = [], taxa // 200  # 5 ms de fade em cada emenda
+    for ini, fim in _trechos(manter):
+        p = x[ini * jan:fim * jan].astype(float)
+        if len(p) > 2 * rampa:
+            p[:rampa] *= np.linspace(0, 1, rampa)
+            p[-rampa:] *= np.linspace(1, 0, rampa)
+        pedacos.append(p)
+    grava_wav(wav, [int(v) for v in np.concatenate(pedacos)], taxa)
+
+
+def _trechos(mascara) -> list[tuple[int, int]]:
+    """(início, fim) de cada sequência de True."""
+    trechos, ini = [], None
+    for k, v in enumerate(list(mascara) + [False]):
+        if v and ini is None:
+            ini = k
+        elif not v and ini is not None:
+            trechos.append((ini, k))
+            ini = None
+    return trechos
+
+
+def palavras_por_minuto(wav: Path, fala: str) -> float:
+    """Ritmo da fala: palavras do roteiro por minuto, contando do começo ao fim da voz."""
+    import numpy as np
+
+    x = _pcm16k(wav)
+    db = np.array([20 * np.log10(np.sqrt(np.mean(x[k:k + 320] ** 2)) + 1e-6) for k in range(0, len(x) - 320, 320)])
+    com_voz = np.flatnonzero(db > np.percentile(db, 90) - 30) if len(db) else []
+    if not len(com_voz):
+        return 0.0
+    segundos = (com_voz[-1] - com_voz[0] + 1) * 0.02
+    return len(re.findall(r"\w+", re.sub(r"[*_]", "", fala))) / segundos * 60
 
 
 def apara_inicio(wav: Path) -> None:
@@ -296,24 +370,36 @@ def confere_fala(wav: Path, texto: str) -> tuple[float, str]:
 
 
 def gera_voz_conferida(cena: dict, destino: Path, voz: dict, motor: str, pronuncia: dict, tentativas: int) -> str:
-    """Gera a fala até `tentativas` vezes e fica com a que o Whisper ouve mais parecida com o roteiro."""
+    """Gera a fala até `tentativas` vezes e fica com a que o Whisper ouve mais parecida com o roteiro.
+
+    Com "ritmo": [mínimo, máximo] em `voz` (palavras por minuto), também prefere a que fica nessa
+    faixa: cada 15 palavras/min fora dela pesam como 10 pontos de semelhança.
+    """
     usado = gera_voz(cena, destino, voz, motor, pronuncia)
     if tentativas <= 1 or usado == "arquivo":
         return usado
-    nota, ouvido = confere_fala(destino, cena["fala"])
+    ritmo = voz.get("ritmo")
+
+    def avalia(wav: Path) -> tuple[float, float, float, str]:
+        nota, ouvido = confere_fala(wav, cena["fala"])
+        ppm = palavras_por_minuto(wav, cena["fala"])
+        fora = max(ritmo[0] - ppm, ppm - ritmo[1], 0) if ritmo else 0
+        return nota - fora / 150, nota, ppm, ouvido
+
+    pontos, nota, ppm, ouvido = avalia(destino)
     for n in range(2, tentativas + 1):
-        if nota >= 0.95:
+        if nota >= (0.93 if ritmo else 0.95) and (not ritmo or ritmo[0] <= ppm <= ritmo[1]):
             break
-        log(f"  tentativa {n - 1} ouviu {nota:.0%}: “{ouvido}”; gerando de novo")
+        log(f"  tentativa {n - 1} ouviu {nota:.0%} a {ppm:.0f} palavras/min: “{ouvido}”; gerando de novo")
         outra = destino.with_suffix(".outra.wav")
         gera_voz(cena, outra, voz, usado, pronuncia)
-        nota2, ouvido2 = confere_fala(outra, cena["fala"])
-        if nota2 > nota:
+        pontos2, nota2, ppm2, ouvido2 = avalia(outra)
+        if pontos2 > pontos:
             outra.replace(destino)
-            nota, ouvido = nota2, ouvido2
+            pontos, nota, ppm, ouvido = pontos2, nota2, ppm2, ouvido2
         else:
             outra.unlink()
-    log(f"  conferida: {nota:.0%} “{ouvido}”")
+    log(f"  conferida: {nota:.0%} a {ppm:.0f} palavras/min “{ouvido}”")
     return usado
 
 

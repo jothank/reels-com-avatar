@@ -154,17 +154,25 @@ No `auto`, o script tenta nesta ordem: gravação, VoiceStudio, ElevenLabs, edge
 4. No roteiro, aponte para o perfil:
 
    ```json
-   "voz": {"voz_voicestudio": "SeuNome", "modelo_voicestudio": "voxcpm2"}
+   "voz": {
+     "voz_voicestudio": "SeuNome",
+     "modelo_voicestudio": "voxcpm2",
+     "estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences.",
+     "ritmo": [140, 175]
+   }
    ```
+
+   O `estilo_voicestudio` e o `ritmo` deixam a fala calma (veja "O que aprendi" abaixo).
 
 5. Renderize conferindo cada fala:
 
    ```bash
-   python scripts/build_reel.py roteiros/meu-video.json --motor voicestudio --conferir 3
+   python scripts/build_reel.py roteiros/meu-video.json --motor voicestudio --conferir 5
    ```
 
-   O `--conferir 3` transcreve cada fala com o Whisper e, se não bater com o roteiro, gera de novo
-   (até 3 vezes). O log mostra o que foi ouvido: leia antes de postar.
+   O `--conferir 5` transcreve cada fala com o Whisper e gera de novo (até 5 vezes) quando ela não bate
+   com o roteiro ou sai do ritmo pedido. Fica a tentativa mais clara e mais perto do ritmo. O log mostra
+   o que foi ouvido e a velocidade de cada cena: leia antes de postar.
 
 Testado numa RTX 3060 de 12 GB. O VoiceStudio aberto ocupa uns 7 GB da placa: feche quando terminar.
 
@@ -173,6 +181,12 @@ Testado numa RTX 3060 de 12 GB. O VoiceStudio aberto ocupa uns 7 GB da placa: fe
 
 ### O que aprendi clonando a voz
 
+- **Sem instrução, a voz clonada fala rápido demais**: 200 a 250 palavras por minuto, e em algumas
+  falas não dá para entender. Uma narração calma fica perto de 150. O que resolveu foi uma instrução
+  de estilo em inglês (`estilo_voicestudio`, que vai como `instruct` para o VoxCPM2): com ela, a fala
+  ficou entre 140 e 185 palavras por minuto, sem mudar o tom de voz. Em português a instrução funcionou
+  menos, e os parâmetros `speed` e `duration` da API quase não mudam nada no VoxCPM2. O script ainda
+  encurta pausas acima de 0,5 s e deixa um respiro de 0,67 s entre as cenas.
 - **Um "iru" no começo de toda fala** era culpa do trecho de referência. O VoxCPM2 continua o
   áudio de referência; se ele termina no meio de uma palavra, toda fala nova começa terminando
   essa palavra. Por isso o `clonar_voz_voicestudio.py` corta entre pausas de verdade e põe

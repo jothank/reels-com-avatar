@@ -323,7 +323,7 @@ const Codigo: React.FC<P<CenaCodigo>> = ({cena, tema, duracao}) => {
           style={{position: 'relative', width: '100%', padding: '60px 40px 44px', opacity: p1, transform: `scale(${0.8 + 0.2 * p1})`}}
         >
           {rotulo(cena.rotuloPedido ?? 'PEDIDO', tema.acento)}
-          <div style={{fontFamily: fontes.mono, fontWeight: 700, fontSize: 50, color: tema.tinta, wordBreak: 'break-all'}}>
+          <div style={{fontFamily: fontes.mono, fontWeight: 700, fontSize: 50, color: tema.tinta, overflowWrap: 'anywhere'}}>
             <Digitado texto={cena.pedido} inicio={t1 + 4} />
           </div>
         </Cartao>
