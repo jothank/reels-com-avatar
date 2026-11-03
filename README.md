@@ -274,6 +274,14 @@ O Claude Code é pago (precisa de uma assinatura do Claude). O resto do projeto 
 - **O VoiceStudio não responde:** confira se ele está aberto em `http://localhost:3900`, ou
   aponte `VOICESTUDIO_URL` para onde ele estiver.
 - **Acentos quebrando o log no Windows:** rode com `PYTHONUTF8=1`.
+- **Windows bloqueia o `.venv\Scripts\python.exe`** ("Uma política de Controle de Aplicativo bloqueou
+  este arquivo"): é o Controle Inteligente de Aplicativos barrando o lançador do uv, que não tem
+  assinatura. Rode com o Python que o uv baixou, apontando para as bibliotecas da venv:
+
+  ```powershell
+  $env:PYTHONPATH = "$PWD\.venv\Lib\site-packages"
+  & "$env:APPDATA\uv\python\cpython-3.12-windows-x86_64-none\python.exe" scripts\build_reel.py roteiros\meu-video.json
+  ```
 - **O render não acha o Chrome:** passe o caminho em `REMOTION_CHROMIUM`.
 
 ## Ética
