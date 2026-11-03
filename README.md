@@ -8,7 +8,7 @@ Com o VoiceStudio, a voz e o vídeo rodam **no seu computador, de graça**: nenh
 
 ![Cenas do vídeo de exemplo](docs/cenas.png)
 
-▶️ **[Assista ao vídeo de exemplo](videos/minha-voz-clonada.mp4)** (39 s, com som). A voz é
+▶️ **[Baixe o vídeo de exemplo](videos/minha-voz-clonada.mp4)** (39 s, 18 MB, com som). A voz é
 clonada e o avatar é desenhado em código.
 
 Feito por [@jothankdev](https://www.instagram.com/jothankdev), com vídeos sobre IA e desenvolvimento
