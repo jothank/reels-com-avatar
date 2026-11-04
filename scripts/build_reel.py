@@ -8,6 +8,10 @@ Uso:
   python3 scripts/build_reel.py roteiros/x.json --motor espeak --sem-render
   python3 scripts/build_reel.py roteiros/x.json --frame 120   # só um quadro PNG (prévia)
   python3 scripts/build_reel.py roteiros/x.json --motor voicestudio --conferir 5   # voz clonada, conferida e no ritmo
+  python3 scripts/build_reel.py roteiros/x.json --motor voicestudio --conferir 5 --so-voz   # só a voz: out/<id>-voz.m4a
+  python3 scripts/build_reel.py roteiros/x.json --reusar-voz                # renderiza com a voz já aprovada
+  python3 scripts/build_reel.py roteiros/x.json --motor voicestudio --conferir 5 --reusar-voz --refazer 3 --so-voz
+                                                                            # gera de novo só a fala da cena 3
 
 Sua voz: grave o roteiro inteiro num áudio só, com ~2 s de pausa entre as cenas, e
 coloque "audio_unico": "gravacoes/<id>.m4a" no roteiro. O script corta nas pausas.
@@ -41,7 +45,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 FPS = 30
 TAXA = 48000
 INICIO_FALA = 6  # frames de respiro antes da fala em cada cena
-FIM_FALA = 20  # frames depois da fala: respiro antes da próxima cena
+FIM_FALA = 14  # frames depois da fala, antes da próxima cena
 
 
 def log(msg: str) -> None:
@@ -157,15 +161,15 @@ def tts_voicestudio(texto: str, destino: Path, voz: dict) -> None:
     para_wav(tmp, destino)
     tmp.unlink(missing_ok=True)
     apara_inicio(destino)
-    encurta_pausas(destino)
+    encurta_pausas(destino, float(voz.get("pausa_maxima", 0.3)))
 
 
-def encurta_pausas(wav: Path, maximo: float = 0.5, sobra_fim: float = 0.12) -> None:
+def encurta_pausas(wav: Path, maximo: float = 0.3, sobra_fim: float = 0.12) -> None:
     """Encurta silêncios longos no meio da fala e corta o silêncio do fim.
 
-    Com o estilo calmo, o VoxCPM2 às vezes para quase um segundo no meio da frase: até ~0,5 s
-    soa como respiro, mais que isso parece que travou. O fim fica com 120 ms; o respiro entre
-    as cenas é o FIM_FALA.
+    Com o estilo calmo, o VoxCPM2 às vezes para quase um segundo no meio da frase. Pausas acima
+    de `maximo` ficam com `maximo`: 0,3 s ainda soa como respiro, e o vídeo não fica arrastado.
+    O fim fica com 120 ms; o respiro entre as cenas é o FIM_FALA.
     """
     import numpy as np
 
@@ -216,6 +220,28 @@ def _trechos(mascara) -> list[tuple[int, int]]:
             trechos.append((ini, k))
             ini = None
     return trechos
+
+
+def muda_andamento(wav: Path, fator: float) -> None:
+    """Fala mais rápida (fator > 1) ou mais lenta sem mudar o tom da voz (filtro atempo do FFmpeg)."""
+    if abs(fator - 1) < 0.01:
+        return
+    tmp = wav.with_suffix(".andamento.wav")
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav), "-af", f"atempo={fator:.3f}",
+                    "-ac", "1", "-ar", str(TAXA), "-sample_fmt", "s16", str(tmp)], check=True)
+    tmp.replace(wav)
+
+
+def ajusta_ritmo(wav: Path, fala: str, alvo: float) -> None:
+    """Leva a fala para `alvo` palavras por minuto, de 0,9× a 1,2× do andamento gerado.
+
+    O estilo calmo do VoxCPM2 articula bem, mas sai lento (130–175 palavras/min); sem ele, sai
+    rápido e embolado (até 250). Gerar calmo e acelerar cada cena até ~175 junta as duas coisas,
+    e todas as cenas ficam no mesmo ritmo. Acima de 1,2× a voz começa a soar acelerada.
+    """
+    ppm = palavras_por_minuto(wav, fala)
+    if ppm:
+        muda_andamento(wav, min(1.2, max(0.9, alvo / ppm)))
 
 
 def palavras_por_minuto(wav: Path, fala: str) -> float:
@@ -333,8 +359,45 @@ def _pcm16k(wav: Path):
     return np.frombuffer(pcm, np.int16).astype(np.float32) / 32768
 
 
-def transcreve(wav: Path) -> str:
-    """O que o faster-whisper (modelo small, no processador) ouve no áudio."""
+_asr_voicestudio = True  # vira False na primeira falha; daí em diante, só o Whisper local
+
+
+def _transcreve_voicestudio(wav: Path, voz: dict) -> str | None:
+    """Whisper do VoiceStudio (large-v3-turbo na placa de vídeo), pela API compatível com a OpenAI."""
+    global _asr_voicestudio
+    if not _asr_voicestudio:
+        return None
+    base = os.environ.get("VOICESTUDIO_URL", voz.get("url_voicestudio", "http://localhost:3900")).rstrip("/")
+    fronteira = os.urandom(12).hex()
+    corpo = b"".join(
+        [f'--{fronteira}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+         for k, v in (("model", "whisper-1"), ("language", "pt"), ("response_format", "json"))]
+        + [f'--{fronteira}\r\nContent-Disposition: form-data; name="file"; filename="fala.wav"\r\n'
+           "Content-Type: audio/wav\r\n\r\n".encode() + wav.read_bytes() + b"\r\n",
+           f"--{fronteira}--\r\n".encode()]
+    )
+    headers = {"Content-Type": f"multipart/form-data; boundary={fronteira}"}
+    if os.environ.get("VOICESTUDIO_API_KEY"):
+        headers["Authorization"] = f"Bearer {os.environ['VOICESTUDIO_API_KEY']}"
+    try:
+        req = urllib.request.Request(f"{base}/v1/audio/transcriptions", data=corpo, headers=headers)
+        with urllib.request.urlopen(req, timeout=300) as r:
+            return json.loads(r.read())["text"].strip()
+    except Exception as e:  # noqa: BLE001
+        _asr_voicestudio = False
+        log(f"  Whisper do VoiceStudio indisponível ({type(e).__name__}); conferindo com o Whisper local")
+        return None
+
+
+def transcreve(wav: Path, voz: dict | None = None) -> str:
+    """O que o Whisper ouve no áudio.
+
+    Com o VoiceStudio aberto, usa o Whisper dele (large-v3-turbo, na placa de vídeo), que entende
+    bem melhor que o small e pega mais erros de pronúncia. Sem ele, o faster-whisper small no processador.
+    """
+    texto = _transcreve_voicestudio(wav, voz or {})
+    if texto is not None:
+        return texto
     global _whisper
     from faster_whisper import WhisperModel
 
@@ -344,25 +407,49 @@ def transcreve(wav: Path) -> str:
     return " ".join(s.text.strip() for s in segmentos)
 
 
-def confere_fala(wav: Path, texto: str) -> tuple[float, str]:
-    """Transcreve a fala gerada (faster-whisper) e compara com o roteiro: (semelhança 0–1, o que foi ouvido).
+_UNIDADES = ("zero um dois três quatro cinco seis sete oito nove dez onze doze treze quatorze quinze "
+             "dezesseis dezessete dezoito dezenove").split()
+_DEZENAS = "_ _ vinte trinta quarenta cinquenta sessenta setenta oitenta noventa".split()
+
+
+def por_extenso(n: int) -> str:
+    """0 a 99 por extenso: o Whisper escreve "34" onde a fala diz "trinta e quatro"."""
+    if n < 20:
+        return _UNIDADES[n]
+    if n < 100:
+        return _DEZENAS[n // 10] + ("" if n % 10 == 0 else f" e {_UNIDADES[n % 10]}")
+    return str(n)
+
+
+def confere_fala(wav: Path, texto: str, voz: dict | None = None) -> tuple[float, str]:
+    """Transcreve a fala gerada (Whisper) e compara com o roteiro: (semelhança 0–1, o que foi ouvido).
 
     Vozes clonadas (VoxCPM2 etc.) às vezes engolem ou trocam palavras; isso pega o problema sem ouvir.
+    Nomes estrangeiros pedem cuidado: o Whisper costuma escrever o nome certo mesmo quando a voz
+    erra a pronúncia, então ouça os nomes antes de publicar.
     """
     from difflib import SequenceMatcher
 
     from montar_gravacao import palavras_do_texto
 
-    ouvido = transcreve(wav)
-    iguais = {"para": "pra", "pro": "pra"}  # o Whisper escreve "para" quando se fala "pra"
+    ouvido = transcreve(wav, voz)
+    ouvido_ext = re.sub(r"\d+", lambda m: por_extenso(int(m.group())), ouvido)
+    # o Whisper escreve "para" quando se fala "pra" e "Cloud Code" quando se fala "Claude Code";
+    # "1." vira "um" e precisa bater com "uma"
+    iguais = {"para": "pra", "pro": "pra", "uma": "um", "duas": "dois", "cloud": "claude"}
     esperado = [iguais.get(p, p) for p in palavras_do_texto(texto)]
-    ouvidas = [iguais.get(p, p) for p in palavras_do_texto(ouvido)]
+    ouvidas = [iguais.get(p, p) for p in palavras_do_texto(ouvido_ext)]
     juntas: list[str] = []  # "Voice Studio" ouvido conta como "VoiceStudio" do roteiro
     for p in ouvidas:
         if juntas and juntas[-1] not in esperado and juntas[-1] + p in esperado:
             juntas[-1] += p
         else:
             juntas.append(p)
+    for k, p in enumerate(juntas):  # nome longo com uma letra trocada ("JotankDev") conta como certo
+        if p not in esperado:
+            perto = [e for e in esperado if len(e) >= 6 and SequenceMatcher(None, p, e).ratio() >= 0.8]
+            if perto:
+                juntas[k] = perto[0]
     nota = SequenceMatcher(None, esperado, juntas).ratio()
     if esperado and esperado[0] not in juntas[:2]:
         nota -= 0.1  # o VoxCPM2 às vezes pula a primeira palavra, e isso quase não mexe na semelhança
@@ -373,7 +460,8 @@ def gera_voz_conferida(cena: dict, destino: Path, voz: dict, motor: str, pronunc
     """Gera a fala até `tentativas` vezes e fica com a que o Whisper ouve mais parecida com o roteiro.
 
     Com "ritmo": [mínimo, máximo] em `voz` (palavras por minuto), também prefere a que fica nessa
-    faixa: cada 15 palavras/min fora dela pesam como 10 pontos de semelhança.
+    faixa: cada 15 palavras/min fora dela pesam como 10 pontos de semelhança. A faixa vale para a
+    fala como saiu do motor; o "ritmo_alvo" acerta o andamento depois, na tentativa escolhida.
     """
     usado = gera_voz(cena, destino, voz, motor, pronuncia)
     if tentativas <= 1 or usado == "arquivo":
@@ -381,7 +469,7 @@ def gera_voz_conferida(cena: dict, destino: Path, voz: dict, motor: str, pronunc
     ritmo = voz.get("ritmo")
 
     def avalia(wav: Path) -> tuple[float, float, float, str]:
-        nota, ouvido = confere_fala(wav, cena["fala"])
+        nota, ouvido = confere_fala(wav, cena["fala"], voz)
         ppm = palavras_por_minuto(wav, cena["fala"])
         fora = max(ritmo[0] - ppm, ppm - ritmo[1], 0) if ritmo else 0
         return nota - fora / 150, nota, ppm, ouvido
@@ -519,6 +607,26 @@ def divide_gravacao(arquivo: Path, n: int, pasta: Path, pausa_min: float = 0.6) 
 
 
 # ------------------------------------------------------------------ principal
+def previa_voz(cenas: list[dict], destino: Path) -> None:
+    """Junta as falas com os mesmos respiros do vídeo: o autor ouve a voz antes do render."""
+    import numpy as np
+
+    partes = []
+    for c in cenas:
+        amostras, taxa = le_wav(RAIZ / "public" / c["audio"])
+        if taxa != TAXA:
+            raise SystemExit(f"{c['audio']}: {taxa} Hz, esperava {TAXA} Hz")
+        ini = round(c["inicioAudio"] / FPS * TAXA)
+        trilha = np.zeros(max(round(c["duracao"] / FPS * TAXA), ini + len(amostras)), dtype=np.int16)
+        trilha[ini:ini + len(amostras)] = amostras
+        partes.append(trilha)
+    tmp = destino.with_suffix(".wav")
+    grava_wav(tmp, np.concatenate(partes).tolist(), TAXA)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(tmp), "-c:a", "aac", "-b:a", "160k", str(destino)],
+                   check=True)
+    tmp.unlink()
+
+
 def chromium() -> str | None:
     for padrao in ("/opt/pw-browsers/chromium_headless_shell-*/*/chrome-headless-shell", "/opt/pw-browsers/chromium"):
         achados = sorted(Path("/").glob(padrao.lstrip("/")))
@@ -538,6 +646,12 @@ def main() -> None:
     ap.add_argument("--texto-gravacao", action="store_true", help="mostra o texto para o autor gravar e sai")
     ap.add_argument("--conferir", type=int, default=1, metavar="N",
                     help="voz sintética: transcreve cada fala e gera de novo (até N vezes) se não bater com o roteiro")
+    ap.add_argument("--so-voz", action="store_true",
+                    help="gera só a voz e junta em out/<id>-voz.m4a, com as pausas do vídeo, para ouvir antes do render")
+    ap.add_argument("--reusar-voz", action="store_true",
+                    help="usa as falas já geradas em public/reels/<id>/ (a voz aprovada) em vez de gerar de novo")
+    ap.add_argument("--refazer", default="", metavar="N,M",
+                    help="com --reusar-voz: gera de novo só estas cenas (ex.: 3,6)")
     args = ap.parse_args()
 
     roteiro = json.loads((RAIZ / args.roteiro).read_text(encoding="utf-8"))
@@ -553,8 +667,10 @@ def main() -> None:
     pronuncia = voz.get("pronuncia", {})
 
     pasta = RAIZ / "public" / "reels" / rid
-    shutil.rmtree(pasta, ignore_errors=True)
-    pasta.mkdir(parents=True)
+    refazer = {int(n) for n in args.refazer.split(",") if n.strip()}
+    if not args.reusar_voz:
+        shutil.rmtree(pasta, ignore_errors=True)
+    pasta.mkdir(parents=True, exist_ok=True)
 
     pedacos: list[Path] = []
     if roteiro.get("audio_unico") and motor in ("auto", "arquivo"):
@@ -566,11 +682,16 @@ def main() -> None:
     for i, cena in enumerate(roteiro["cenas"], 1):
         wav = pasta / f"cena-{i}.wav"
         if pedacos:
-            pedacos[i - 1].rename(wav)
+            pedacos[i - 1].replace(wav)
             usado = "gravação"
+        elif args.reusar_voz and wav.exists() and i not in refazer:
+            usado = "reusada"
         else:
             usado = gera_voz_conferida(cena, wav, voz, motor, pronuncia, args.conferir)
+            if usado != "arquivo" and voz.get("ritmo_alvo"):
+                ajusta_ritmo(wav, cena["fala"], float(voz["ritmo_alvo"]))
         usados.add(usado)
+        ritmo_final = palavras_por_minuto(wav, cena["fala"])
         env, segundos = envelope_boca(wav, FPS)
         duracao = max(75, INICIO_FALA + len(env) + FIM_FALA)
         trilha = [0.0] * duracao
@@ -580,7 +701,7 @@ def main() -> None:
         c = {k: v for k, v in cena.items() if k != "audio_arquivo"}
         c.update({"audio": f"reels/{rid}/cena-{i}.wav", "duracao": duracao, "inicioAudio": INICIO_FALA})
         cenas.append(c)
-        log(f"cena {i}: {segundos:.1f}s de fala ({usado})")
+        log(f"cena {i}: {segundos:.1f}s de fala a {ritmo_final:.0f} palavras/min ({usado})")
 
     props = {
         "id": rid,
@@ -602,6 +723,11 @@ def main() -> None:
     if "espeak" in usados:
         log("AVISO: voz espeak é robótica (rascunho). Use sua gravação, ElevenLabs ou edge-tts para a versão final.")
 
+    if args.so_voz:
+        previa = RAIZ / "out" / f"{rid}-voz.m4a"
+        previa_voz(cenas, previa)
+        log(f"voz para ouvir: {previa} (aprovada, renderize com --reusar-voz)")
+        return
     if args.sem_render:
         log(f"props em {props_path}")
         return

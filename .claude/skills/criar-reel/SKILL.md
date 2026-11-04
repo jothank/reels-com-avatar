@@ -21,7 +21,12 @@ videos/<id>.mp4           ← resultado
 2. **Escreva o roteiro** em `roteiros/<id>.json` (id em kebab-case), seguindo as regras abaixo.
 3. **Prévia rápida**: `python3 scripts/build_reel.py roteiros/<id>.json --frame N`, gerando um PNG em `out/`.
    Olhe 2–3 quadros (meio de cada cena) com a ferramenta Read e corrija texto estourando, sobreposição etc.
-4. **Render final**: `python3 scripts/build_reel.py roteiros/<id>.json` gera `videos/<id>.mp4`.
+4. **Voz antes do vídeo**: com voz sintética, gere só a voz
+   (`python3 scripts/build_reel.py roteiros/<id>.json --motor voicestudio --conferir 5 --so-voz`) e mande
+   `out/<id>-voz.m4a` para o autor ouvir (SendUserFile), dizendo em que segundo está cada nome estrangeiro.
+   Se ele apontar uma cena, refaça só ela: `--reusar-voz --refazer N --conferir 5 --so-voz`.
+   **Render final**, depois do OK: `python3 scripts/build_reel.py roteiros/<id>.json --reusar-voz` gera
+   `videos/<id>.mp4` com a voz aprovada, sem gerar de novo. Com a voz do autor gravada, pule direto para o render.
 5. Envie o vídeo ao usuário (SendUserFile) e faça commit de `roteiros/<id>.json` + `videos/<id>.mp4`.
 
 Primeira vez na máquina: `npm install` e `pip install -r requirements.txt`; precisa de Node 18+,
@@ -112,18 +117,27 @@ No modo `auto`, o script detecta o VoiceStudio em `http://localhost:3900` (ou `V
 **Motor recomendado: VoxCPM2** (`"modelo_voicestudio": "voxcpm2"`): Apache-2.0 (pode usar comercialmente),
 fala português, roda na GPU. Testado com o VoiceStudio 0.5.7.
 O OmniVoice (padrão do app) é **não comercial** (CC-BY-NC) e pede aceite de licença no app.
-Para o render final use `--motor voicestudio --conferir 5`: no `auto`, se o VoiceStudio falhar, o script cai calado
-para o edge-tts; e o VoxCPM2 às vezes engole ou troca palavras, então o `--conferir` transcreve cada fala com o Whisper e
-gera de novo (até 5 vezes) quando não bate com o roteiro. O log mostra o que foi ouvido em cada cena: leia antes de entregar.
-**Ritmo da fala:** sem instrução, o clone fala a 200–250 palavras por minuto, rápido demais para entender. Use sempre em `voz`:
+Gere a voz com `--motor voicestudio --conferir 5`: no `auto`, se o VoiceStudio falhar, o script cai calado
+para o edge-tts; e o VoxCPM2 às vezes engole ou troca palavras, então o `--conferir` transcreve cada fala e
+gera de novo (até 5 vezes) quando não bate com o roteiro. Com o VoiceStudio aberto, a conferência usa o Whisper dele
+(large-v3-turbo, na placa de vídeo, ~1 s por fala); sem ele, o small no processador, que ouve bem pior.
+O log mostra o que foi ouvido em cada cena: leia antes de entregar. Mas o Whisper escreve o nome certo mesmo quando a
+pronúncia está errada: **nome estrangeiro só se confirma ouvindo**.
+**Ritmo da fala:** sem instrução, o clone fala a 200–250 palavras por minuto, rápido e embolado; com a instrução calma,
+130–175, lento demais. O que ficou bom: gerar calmo e acelerar cada cena para 175 palavras/min. Use sempre em `voz`:
 `"estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences."`
-(vai como `instruct` para o VoxCPM2; em inglês funcionou melhor que em português) e `"ritmo": [140, 175]`.
-Com o `--conferir`, o build fica com a tentativa mais clara e mais perto dessa faixa, encurta pausas acima de
-0,5 s e deixa 0,67 s de respiro no fim de cada cena. O `speed` e o `duration` da API quase não mudam nada no VoxCPM2.
-Nomes estrangeiros saem melhor com grafia de pronúncia em `voz.pronuncia` (ex.: `"Remotion": "Rimóshon"`,
-`"VoiceStudio": "Vóice Stúdio"`); evite "reel" na fala (sai "rei"). Grafias que já funcionaram:
-`"Postman": "Pôust mén"`, `"IA": "ia"` (em maiúsculas a palavra some), `"skill": "isquíl"`. Não comece a fala com
-um nome em inglês ("Skill é…" saiu "SQL é…"): ponha um artigo antes ("Uma skill é…"). A chave do `pronuncia`
+(vai como `instruct` para o VoxCPM2; em inglês funcionou melhor que em português), `"ritmo": [145, 190]` (faixa da
+tentativa escolhida, antes de acelerar) e `"ritmo_alvo": 175`. O build acelera ou freia cada cena até o alvo
+(de 0,9× a 1,2×, filtro `atempo`, sem mudar o tom), deixa as pausas internas com no máximo 0,3 s e põe 0,47 s
+de respiro no fim de cada cena. O `speed` e o `duration` da API quase não mudam nada no VoxCPM2.
+**Grafias** em `voz.pronuncia`:
+- Nomes em inglês muito conhecidos saem melhor **escritos em inglês, sem grafia**: `GitHub` (com "Guíti Râbi" saía
+  "gitirabi") e `hallmark` (com "rólmark" saía "Roma"/"Rumark").
+- Funcionaram: `"Postman": "Pôustmen"`, `"IA": "i-á"` (em maiúsculas some; "ia" sai "ía"), `"Claude Code": "Clóud Côud"`,
+  `"CLAUDE.md": "Clóud ponto eme dê"`, `"skill": "isquíl"`, `"Remotion": "Rimóshon"`, `"VoiceStudio": "Vóice Stúdio"`.
+- Nome que já está na tela não precisa ser falado; nome difícil, fale uma vez só.
+Não comece a fala com um nome em inglês ("Skill é…" saiu "SQL é…") nem com "A IA" (sai "Aí a"): ponha outra palavra
+antes ("Uma skill é…", "O agente faz…"). Evite "reel" na fala (sai "rei"). A chave do `pronuncia`
 diferencia maiúsculas: "Skill" e "skill" são entradas diferentes.
 
 **VoiceStudio no Windows pelo Claude Desktop:**

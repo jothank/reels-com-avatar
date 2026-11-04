@@ -158,21 +158,30 @@ No `auto`, o script tenta nesta ordem: gravação, VoiceStudio, ElevenLabs, edge
      "voz_voicestudio": "SeuNome",
      "modelo_voicestudio": "voxcpm2",
      "estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences.",
-     "ritmo": [140, 175]
+     "ritmo": [145, 190],
+     "ritmo_alvo": 175
    }
    ```
 
-   O `estilo_voicestudio` e o `ritmo` deixam a fala calma (veja "O que aprendi" abaixo).
+   O `estilo_voicestudio` deixa a fala clara, e o `ritmo_alvo` acerta a velocidade (veja "O que aprendi" abaixo).
 
-5. Renderize conferindo cada fala:
+5. Gere só a voz e ouça antes de montar o vídeo:
 
    ```bash
-   python scripts/build_reel.py roteiros/meu-video.json --motor voicestudio --conferir 5
+   python scripts/build_reel.py roteiros/meu-video.json --motor voicestudio --conferir 5 --so-voz
    ```
 
    O `--conferir 5` transcreve cada fala com o Whisper e gera de novo (até 5 vezes) quando ela não bate
-   com o roteiro ou sai do ritmo pedido. Fica a tentativa mais clara e mais perto do ritmo. O log mostra
-   o que foi ouvido e a velocidade de cada cena: leia antes de postar.
+   com o roteiro ou sai do ritmo pedido. Com o VoiceStudio aberto, quem ouve é o Whisper grande dele
+   (large-v3-turbo, na placa de vídeo). O log mostra o que foi ouvido e a velocidade de cada cena, e a voz
+   inteira, com as pausas do vídeo, fica em `out/meu-video-voz.m4a`. Não gostou de uma cena? Refaça só ela:
+   `--reusar-voz --refazer 3 --conferir 5 --so-voz`.
+
+6. Com a voz aprovada, renderize sem gerar de novo:
+
+   ```bash
+   python scripts/build_reel.py roteiros/meu-video.json --reusar-voz
+   ```
 
 Testado numa RTX 3060 de 12 GB. O VoiceStudio aberto ocupa uns 7 GB da placa: feche quando terminar.
 
@@ -182,11 +191,15 @@ Testado numa RTX 3060 de 12 GB. O VoiceStudio aberto ocupa uns 7 GB da placa: fe
 ### O que aprendi clonando a voz
 
 - **Sem instrução, a voz clonada fala rápido demais**: 200 a 250 palavras por minuto, e em algumas
-  falas não dá para entender. Uma narração calma fica perto de 150. O que resolveu foi uma instrução
-  de estilo em inglês (`estilo_voicestudio`, que vai como `instruct` para o VoxCPM2): com ela, a fala
-  ficou entre 140 e 185 palavras por minuto, sem mudar o tom de voz. Em português a instrução funcionou
-  menos, e os parâmetros `speed` e `duration` da API quase não mudam nada no VoxCPM2. O script ainda
-  encurta pausas acima de 0,5 s e deixa um respiro de 0,67 s entre as cenas.
+  falas não dá para entender. Uma instrução de estilo em inglês (`estilo_voicestudio`, que vai como
+  `instruct` para o VoxCPM2) deixa a fala clara, mas lenta: 130 a 175 palavras por minuto, e o vídeo
+  fica arrastado. O que ficou bom foi juntar as duas coisas: gerar no estilo calmo e acelerar cada cena
+  até 175 palavras por minuto (`ritmo_alvo`), sem mudar o tom (filtro `atempo` do FFmpeg, no máximo 1,2×).
+  O script também deixa as pausas no meio da frase com no máximo 0,3 s. Os parâmetros `speed` e
+  `duration` da API quase não mudam nada no VoxCPM2.
+- **O Whisper escreve o nome certo mesmo quando a voz erra.** O small escreveu "GitHub" numa fala em que
+  dava para ouvir "gitirabi". O large-v3-turbo do VoiceStudio pega muito mais, mas nome estrangeiro
+  só se confirma ouvindo: por isso a voz sai antes do vídeo, em `out/<id>-voz.m4a`.
 - **Um "iru" no começo de toda fala** era culpa do trecho de referência. O VoxCPM2 continua o
   áudio de referência; se ele termina no meio de uma palavra, toda fala nova começa terminando
   essa palavra. Por isso o `clonar_voz_voicestudio.py` corta entre pausas de verdade e põe
@@ -194,8 +207,10 @@ Testado numa RTX 3060 de 12 GB. O VoiceStudio aberto ocupa uns 7 GB da placa: fe
 - **Deixe o VoiceStudio transcrever a referência.** Com a transcrição do Whisper small, o
   VoxCPM2 pulava a primeira palavra das falas; com a do large-v3-turbo, inventava sílabas no começo.
 - **Evite começar uma fala com "E" sozinho** ("E o melhor…"): ele costuma engolir ou embolar.
-- **Nomes estrangeiros saem melhor escritos como se fala**, em `voz.pronuncia`:
-  `{"Remotion": "Rimóshon", "YouTube": "iutúbi"}`. Na tela continua o nome certo.
+- **Nomes estrangeiros: teste antes.** Alguns saem melhor escritos como se fala, em `voz.pronuncia`
+  (`{"Remotion": "Rimóshon", "Postman": "Pôustmen", "IA": "i-á"}`); na tela continua o nome certo.
+  Os mais conhecidos saem melhor escritos em inglês mesmo: com "Guíti Râbi", `GitHub` virava "gitirabi".
+  Nome que já aparece na tela não precisa ser falado.
 
 ### Gravando com a sua voz de verdade
 

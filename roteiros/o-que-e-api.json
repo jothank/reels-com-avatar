@@ -9,7 +9,8 @@
     "voz_edge": "pt-BR-AntonioNeural",
     "voz_voicestudio": "Jonathan",
     "estilo_voicestudio": "Speak slowly and calmly, in a warm and friendly tone, with natural pauses between sentences.",
-    "ritmo": [140, 175]
+    "ritmo": [145, 190],
+    "ritmo_alvo": 175
   },
   "cenas": [
     {
